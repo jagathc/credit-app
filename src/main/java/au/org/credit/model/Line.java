@@ -80,4 +80,5 @@ public class Line {
 	public void setUtilisation(int utilisation) {
 		this.utilisation = utilisation;
 	}
+
 }

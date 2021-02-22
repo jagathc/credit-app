@@ -4,69 +4,140 @@
 package au.org.credit;
 
 import java.io.IOException;
-import java.util.List;
+import java.nio.file.Files;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Stack;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import au.org.credit.model.LimitUtilisation;
 import au.org.credit.model.Line;
 import au.org.credit.model.Node;
 import au.org.credit.util.FileReader;
 
-public class CreditLineProcessor<T> {
+public class CreditLineProcessor {
 
+	private final Set<Node> trees = new HashSet<>();
+
+	/**
+	 * This method read the credit entries from the data file for processing.
+	 * @throws IOException
+	 */
 	public void processCredits() throws IOException {
-		List<String[]> lines = FileReader.readFile();
-		List<Line> list = lines.parallelStream().map(
-				line -> new Line(line[0].trim(), line[1].trim(), Integer.valueOf(line[2]), Integer.valueOf(line[3])))
-				.collect(Collectors.toList());
-		
-		
+		try (Stream<Line> fileLines = FileReader.readFile()) {
+			fileLines.forEach(this::updateTree);
+		}
+	}
+
+	/**
+	 * This method calculates the credit utilisation of each tree.
+	 * @throws IOException
+	 */
+	public void calculateCombinedUtilisation() {
+		for (Node tree: trees) {
+			tree.calculateCombinedUtilisation();
+		}
+	}
+
+	/**
+	 * This method prints the report.
+	 */
+	public void printReport() {
+		Set<Node> withInLimitNodes = new HashSet<>();
+		Set<Node> limitBreachedNodes = new HashSet<>();
+
+		for (Node root: trees) {
+			Stack<Node> stack = new Stack<>();
+			stack.push(root);
+
+			do {
+				Node currentNode = stack.pop();
+				if (currentNode.isLimitBreached()) {
+					limitBreachedNodes.add(currentNode);
+				} else {
+					withInLimitNodes.add(currentNode);
+					for (Node child: currentNode.getChildren()) {
+						stack.push(child);
+					}
+				}
+
+			} while(!stack.isEmpty());
+		}
+
+		System.out.print("Entries: ");
+		System.out.print(
+				withInLimitNodes.stream()
+					.map(Node::getName)
+					.collect(Collectors.joining("/"))
+		);
+		System.out.println(" :");
+		System.out.println("No limit breaches\n\n");
+
+		limitBreachedNodes
+				.forEach(node -> {
+					System.out.print("Entries: ");
+					System.out.print(node.getName() + "/");
+					System.out.print(node.getAllDescendants().map(Node::getName).collect(Collectors.joining("/")));
+
+					System.out.println(" :");
+					System.out.printf(
+							"Limit breach at %s (limit = %d, direct utilisation = %d, combined utilisation = %d).%n",
+							node.getName(), node.getLimit(), node.getDirectUtilisation(), node.getCombinedUtilisation()
+
+					);
+
+				});
 	}
 	
-	private fun updateTree(trees: MutableSet<Node<LimitUtilisation>>, line: Line): MutableSet<Node<LimitUtilisation>> {
-	    if (line.parent.isBlank()) {
-	        trees.add(line.toNode())
-	        return trees
+	private void updateTree(Line line) {
+	    if (line.getParent() == null) {
+	        trees.add(
+					new Node(line.getName(), line.getLimit(), line.getUtilisation())
+			);
+
+	        return;
 	    }
 
-	    for (root in trees) {
-	        val parentNode = findNode(root, line.parent)
-	        if (parentNode != null) {
-	            val childNode = line.toNode()
-	            parentNode.addChild(childNode)
+		for (Node root: trees) {
+			Node parentNode = findNode(root, line.getParent());
+			if (parentNode != null) {
+				Node childNode = new Node(
+						line.getName(), line.getLimit(), line.getUtilisation()
+				);
 
-	            break
-	        }
-	    }
-
-	    return trees
+				parentNode.addChild(childNode);
+				break;
+			}
+		}
 	}
 
-	private Node<T> findNode(Node<T> root, String name) {
-		Stack<Node<T>> stack = new Stack<Node<T>>();
+	private Node findNode(Node root, String name) {
+		Stack<Node> stack = new Stack<>();
 	    stack.push(root);
 
-	    Node<T> node = null;
-
 	    do {
-	    	Node<T> currentNode = stack.pop();
+	    	Node currentNode = stack.pop();
 	        if (currentNode.getName().equals(name)) {
 	            return currentNode;
 	        }
 
-	        currentNode.getChildren().forEach() { child -> stack.push(child) }
-	    } while(stack.isNotEmpty())
+	        currentNode.getChildren().forEach(stack::push);
+	    } while(!stack.isEmpty());
 
-	    return node;
+	    return null;
 	}
 
 	public static void main(String[] args) {
+		CreditLineProcessor processor = new CreditLineProcessor();
 		try {
-			new CreditLineProcessor().processCredits();
+			processor.processCredits();
 		} catch (IOException e) {
 			e.printStackTrace();
+			System.exit(-1);
 		}
+
+		processor.calculateCombinedUtilisation();
+		processor.printReport();
 	}
 
 }

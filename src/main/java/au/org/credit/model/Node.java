@@ -3,27 +3,29 @@
  */
 package au.org.credit.model;
 
+import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author jagath
  *
  */
-public class Node<T> {
+public class Node {
 	private String name;
-	private T data;
+	private int limit;
+	private int directUtilisation;
+	private int combinedUtilisation = -1;
+
 	
-	private Node<T> parent;
-	private Set<T> children;
+	private Node parent;
+	private Set<Node> children = new HashSet<>();
 	
-	/**
-	 * This constructs a node instance.
-	 * @param name
-	 * @param data
-	 */
-	public Node(String name, T data) {
+	public Node(String name, int limit, int directUtilisation) {
 		this.name = name;
-		this.data = data;
+		this.limit = limit;
+		this.directUtilisation = directUtilisation;
 	}
 
 	/**
@@ -34,51 +36,83 @@ public class Node<T> {
 	}
 
 	/**
-	 * @param name the name to set
+	 * @return the limit
 	 */
-	public void setName(String name) {
-		this.name = name;
+	public int getLimit() {
+		return limit;
 	}
 
 	/**
-	 * @return the data
+	 * @return the direct utilisation.
 	 */
-	public T getData() {
-		return data;
+	public int getDirectUtilisation() {
+		return directUtilisation;
 	}
 
 	/**
-	 * @param data the data to set
+	 * @return the combined utilisation.
 	 */
-	public void setData(T data) {
-		this.data = data;
+	public int getCombinedUtilisation() {
+		return combinedUtilisation;
 	}
-
+	
 	/**
 	 * @return the parent
 	 */
-	public Node<T> getParent() {
+	public Node getParent() {
 		return parent;
-	}
-
-	/**
-	 * @param parent the parent to set
-	 */
-	public void setParent(Node<T> parent) {
-		this.parent = parent;
 	}
 
 	/**
 	 * @return the children
 	 */
-	public Set<T> getChildren() {
+	public Set<Node> getChildren() {
 		return children;
 	}
 
 	/**
-	 * @param children the children to set
+	 * @return add the child
 	 */
-	public void setChildren(Set<T> children) {
-		this.children = children;
+	public void addChild(Node child) {
+		child.parent = this;
+		this.children.add(child);
+	}
+
+	/**
+	 * This method calculates the combined utilisation.
+	 * 
+	 * @return the combined utilisation
+	 */
+	public int calculateCombinedUtilisation() {
+
+		int combinedUtilisationForChildren = 0;
+
+		for (Node child: children) {
+			combinedUtilisationForChildren += child.calculateCombinedUtilisation();
+		}
+
+		this.combinedUtilisation = combinedUtilisationForChildren + directUtilisation;
+
+		return combinedUtilisation;
+	}
+
+	/**
+	 * Checks the limit is breached.
+	 * @return
+	 */
+	public boolean isLimitBreached() {
+		return this.combinedUtilisation > limit;
+	}
+
+	/**
+	 * All the descendants.
+	 * @return
+	 */
+	public Stream<Node> getAllDescendants() {
+		return children.parallelStream().map(Node::getAllDescendants)
+				.reduce(
+						children.stream(),
+						Stream::concat
+				);
 	}
 }

@@ -3,14 +3,12 @@
  */
 package au.org.credit.util;
 
+import au.org.credit.model.Line;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -21,21 +19,29 @@ public class FileReader {
 	private static final String DATA_FILE_PATH = "src/main/resources/data.csv";
 
 	/**
-	 * This method reads a csv file and returns the content as list of lines.
+	 * This method reads a csv file and returns the content as stream of lines.
 	 * 
 	 * @return
 	 * @throws IOException
 	 */
-	public static List<String[]> readFile() throws IOException {
+	public static Stream<Line> readFile() throws IOException {
 		Path path = Paths.get(DATA_FILE_PATH);
-		List<String[]> lines = new LinkedList<>();
+
 
 		if (Files.exists(path)) {
-			try (Stream<String> fileLines = Files.lines(path)) {
-				lines = fileLines.skip(1).map(line -> line.split(","))
-						.collect(Collectors.toList());
-			}
+			return Files.lines(path)
+					.skip(1)
+					.map(line -> line.split(","))
+					.map(data -> {
+						String name = data[0].trim();
+						String parent = data[1].isBlank() ? null : data[1].trim();
+						int limit = Integer.parseInt(data[2].trim());
+						int directUtilisation = Integer.parseInt(data[3].trim());
+
+						return new Line(name, parent, limit, directUtilisation);
+					});
 		}
-		return lines;
+
+		return Stream.empty();
 	}
 }
